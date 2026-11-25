@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Entorno y credenciales
+.env
+*.key
+*.pem
+*.crt
+*passwd*
+*secret*
+
+# Node-RED / Node.js
+node_modules/
+*_cred.json
+.config*.json
+
+# Windows / IDE
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard SCADA + Control PID de Tanque — Factory I/O (172.26.32.1:502)</title>
+  <style>
+    :root {
+      --bg-main: #111827;
+      --bg-panel: #1F2937;
+      --bg-card: #0F172A;
+      --border: #374151;
+      --text-main: #F9FAFB;
+      --text-muted: #9CA3AF;
+      --blue: #38BDF8;
+      --green: #34D399;
+      --emerald: #10B981;
+      --red: #F87171;
+      --amber: #FBBF24;
+      --purple: #A78BFA;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Barra superior */
+    .top-bar {
+      background-color: var(--bg-panel);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-title {
+      font-size: 1.08rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-conn {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 4px;
+      background-color: #F59E0B;
+      color: #111827;
+    }
+
+    .badge-conn.online {
+      background-color: var(--emerald);
+      color: #111827;
+    }
+
+    .badge-conn.offline {
+      background-color: #EF4444;
+      color: #FFFFFF;
+    }
+
+    /* Contenedor de 3 columnas (idéntico al dashboard Tkinter) */
+    .main-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 300px 1fr;
+      gap: 12px;
+      padding: 12px;
+      min-height: calc(100vh - 56px);
+    }
+
+    @media (max-width: 1100px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background-color: var(--bg-panel);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid #263244;
+    }
+
+    .section-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .title-blue { color: var(--blue); }
+    .title-green { color: var(--green); }
+    .title-amber { color: var(--amber); }
+    .title-white { color: var(--text-main); }
+
+    .sp-box {
+      background-color: var(--bg-main);
+      color: var(--red);
+      font-family: "Consolas", monospace;
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .control-label {
+      font-size: 0.78rem;
+      color: #D1D5DB;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+      cursor: pointer;
+    }
+
+    .row-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    input[type="number"], input[type="text"] {
+      background-color: var(--bg-main);
+      color: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-family: "Consolas", monospace;
+      font-size: 0.9rem;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #FFFFFF;
+      transition: filter 0.15s;
+      text-decoration: none;
+      text-align: center;
+    }
+
+    .btn:hover { filter: brightness(1.12); }
+    .btn-blue { background-color: #0284C7; }
+    .btn-royal { background-color: #2563EB; }
+    .btn-green { background-color: #059669; }
+    .btn-amber { background-color: #D97706; }
+    .btn-gray { background-color: #374151; color: #F9FAFB; }
+
+    .quick-btns {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: #D1D5DB;
+      cursor: pointer;
+    }
+
+    .divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 2px 0;
+    }
+
+    .gains-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .gain-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .gain-item label {
+      font-family: "Consolas", monospace;
+      font-size: 0.82rem;
+      color: #D1D5DB;
+    }
+
+    .gain-item input {
+      width: 100%;
+      color: var(--green);
+    }
+
+    .csv-status {
+      background-color: var(--bg-main);
+      color: var(--green);
+      font-family: "Consolas", monospace;
+      font-size: 0.82rem;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      line-height: 1.4;
+    }
+
+    .csv-status.paused {
+      color: var(--amber);
+    }
+
+    /* Columna central: Tanque y KPIs */
+    .tank-wrapper {
+      display: flex;
+      justify-content: center;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px;
+    }
+
+    .kpi-card {
+      background-color: var(--bg-main);
+      padding: 7px 10px;
+      border-radius: 4px;
+      border: 1px solid #1E293B;
+    }
+
+    .kpi-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .kpi-val {
+      font-family: "Consolas", monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    /* Columna derecha: Gráficas */
+    .charts-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      position: relative;
+      min-height: 520px;
+    }
+
+    #canvasPlot {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR -->
+  <header class="top-bar">
+    <div class="top-title">SCADA TANQUE FACTORY I/O — CONTROLADOR PID Y REGISTRO DE DATOS</div>
+    <div id="badgeConn" class="badge-conn">CONECTANDO...</div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL 3 COLUMNAS -->
+  <main class="main-grid">
+
+    <!-- COLUMNA IZQUIERDA: CONTROLES -->
+    <section class="panel">
+      <div class="section-title title-blue">1. CONTROL DE SETPOINT (SP)</div>
+      <div id="lblSpDisplay" class="sp-box">SP: 50.0 % (150.0 cm)</div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Deslizador Setpoint [%]</span>
+          <span id="lblSliderSpVal">50.0%</span>
+        </div>
+        <input id="sliderSp" type="range" min="0" max="100" step="0.5" value="50" />
+      </div>
+
+      <div class="row-inline">
+        <span style="font-size: 0.8rem; color: #D1D5DB;">SP exacto (%):</span>
+        <input id="inputSpExact" type="number" min="0" max="100" step="0.5" value="50.0" style="width: 80px;" />
+        <button class="btn btn-blue" onclick="aplicarSpTexto()">Aplicar SP</button>
+      </div>
+
+      <div class="quick-btns">
+        <button class="btn btn-gray" onclick="fijarSetpoint(20)">20%</button>
+        <button class="btn btn-gray" onclick="fijarSetpoint(40)">40%</button>
+        <button class="btn btn-gray" onclick="fijarSetpoint(50)">50%</button>
+        <button class="btn btn-gray" onclick="fijarSetpoint(70)">70%</button>
+        <button class="btn btn-gray" onclick="fijarSetpoint(85)">85%</button>
+      </div>
+
+      <label class="check-row">
+        <input id="chkPotFio" type="checkbox" onchange="enviarConfig()" />
+        <span>Leer SP desde perilla Factory I/O (Input Reg 2)</span>
+      </label>
+
+      <div class="divider"></div>
+
+      <!-- SECCIÓN 2: CONTROLADOR PID -->
+      <div class="section-title title-green">2. CONTROLADOR PID Y VÁLVULAS</div>
+
+      <div class="row-inline" style="gap: 16px;">
+        <label class="check-row" style="font-weight: 700; color: #F9FAFB;">
+          <input type="radio" name="modoControl" value="PID" checked onchange="enviarConfig()" />
+          <span>Automático (PID)</span>
+        </label>
+        <label class="check-row" style="color: #F9FAFB;">
+          <input type="radio" name="modoControl" value="MANUAL" onchange="enviarConfig()" />
+          <span>Manual</span>
+        </label>
+      </div>
+
+      <div class="gains-grid">
+        <div class="gain-item">
+          <label>Kp:</label>
+          <input id="inputKp" type="text" value="3.2000" />
+        </div>
+        <div class="gain-item">
+          <label>Ki:</label>
+          <input id="inputKi" type="text" value="0.2500" />
+        </div>
+        <div class="gain-item">
+          <label>Kd:</label>
+          <input id="inputKd" type="text" value="1.8000" />
+        </div>
+      </div>
+
+      <div class="row-inline">
+        <button class="btn btn-green" onclick="aplicarGanancias()">Aplicar Kp/Ki/Kd</button>
+        <button class="btn btn-blue" onclick="cargarPreset(3.2000, 0.2500, 1.8000)">PID Optimizado</button>
+        <button class="btn btn-gray" onclick="cargarPreset(5.6893, 0.7471, 10.8310)">Z-N Original</button>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label" style="color: var(--amber);">
+          <span>Válvula de Descarga Base (Holding Reg 1) [%]</span>
+          <span id="lblDescBase">35%</span>
+        </div>
+        <input id="sliderDesc" type="range" min="0" max="100" step="1" value="35" style="accent-color: var(--amber);" oninput="onSliderValvulas()" />
+      </div>
+
+      <label class="check-row">
+        <input id="chkDescAuto" type="checkbox" checked onchange="enviarConfig()" />
+        <span>Ayuda vaciado automático si Nivel &gt; SP + 1.5%</span>
+      </label>
+
+      <div class="control-group">
+        <div class="control-label" style="color: var(--purple);">
+          <span>Fill Valve Manual (solo en modo Manual) [%]</span>
+          <span id="lblFillMan">0%</span>
+        </div>
+        <input id="sliderFillManual" type="range" min="0" max="100" step="1" value="0" style="accent-color: var(--purple);" oninput="onSliderValvulas()" />
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- SECCIÓN 3: REGISTRO DE DATOS -->
+      <div class="section-title title-amber">3. REGISTRO DE DATOS (CSV + PNG)</div>
+      <div id="boxCsvStatus" class="csv-status">
+        ● GRABANDO: 0 muestras<br />registro_pid_tanque.csv
+      </div>
+
+      <div class="row-inline" style="justify-content: space-between;">
+        <button id="btnToggleCsv" class="btn btn-amber" style="flex:1;" onclick="accionCsv('toggle')">Pausar CSV</button>
+        <button class="btn btn-gray" style="flex:1;" onclick="accionCsv('reset')">Reiniciar CSV</button>
+        <a class="btn btn-royal" style="flex:1;" href="/api/download-csv" target="_blank">Descargar CSV</a>
+      </div>
+    </section>
+
+    <!-- COLUMNA CENTRAL: TANQUE ANIMADO Y KPIS -->
+    <section class="panel">
+      <div class="section-title title-white" style="text-align: center;">ESTADO VISUAL DEL TANQUE</div>
+      <div class="tank-wrapper">
+        <canvas id="canvasTanque" width="260" height="385"></canvas>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">NIVEL ACTUAL (PV - Input Reg 0)</div>
+        <div id="kpiPv" class="kpi-val" style="color: var(--blue);">0.0 %  |  0.0 cm  |  0.00 V</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">ERROR DE CONTROL (e = SP - PV)</div>
+        <div id="kpiErr" class="kpi-val" style="color: var(--amber);">+0.0 %  (+0.0 cm)</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">VÁLVULAS (Holding Reg 0 y 1)</div>
+        <div id="kpiValves" class="kpi-val" style="color: var(--green);">Fill: 0.0 %  |  Desc: 35.0 %</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">CAUDALÍMETRO (Flow meter - Input Reg 1)</div>
+        <div id="kpiFlow" class="kpi-val" style="color: var(--purple);">0.00 V</div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA: GRÁFICAS EN TIEMPO REAL -->
+    <section class="panel">
+      <div class="section-title title-white">CURVAS EN TIEMPO REAL: SETPOINT (SP) vs NIVEL (PV) Y ACCIÓN DE VÁLVULAS</div>
+      <div class="charts-container">
+        <canvas id="canvasPlot"></canvas>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const ALTURA_MAX_CM = 300.0;
+
+    // Estado local para renderizado
+    let state = {
+      conectado: false,
+      host: "172.26.32.1",
+      port: 502,
+      modo: "PID",
+      usar_pot_fio: false,
+      descarga_auto: true,
+      setpoint_pct: 50.0,
+      nivel_pct: 0.0,
+      nivel_cm: 0.0,
+      nivel_v: 0.0,
+      flow_v: 0.0,
+      fill_pct: 0.0,
+      discharge_pct: 35.0,
+      registrando_csv: true,
+      muestras_guardadas: 0,
+      hist_t: [],
+      hist_sp: [],
+      hist_pv: [],
+      hist_fill: [],
+      hist_desc: []
+    };
+
+    // Eventos del deslizador de Setpoint
+    const sliderSp = document.getElementById("sliderSp");
+    sliderSp.addEventListener("input", () => {
+      document.getElementById("chkPotFio").checked = false;
+      const val = parseFloat(sliderSp.value);
+      document.getElementById("inputSpExact").value = val.toFixed(1);
+      actualizarTextoSp(val);
+      enviarConfig({ setpoint_pct: val, usar_pot_fio: false });
+    });
+
+    function actualizarTextoSp(spPct) {
+      const spCm = (spPct / 100.0) * ALTURA_MAX_CM;
+      document.getElementById("lblSpDisplay").textContent = `SP: ${spPct.toFixed(1)} % (${spCm.toFixed(1)} cm)`;
+      document.getElementById("lblSliderSpVal").textContent = `${spPct.toFixed(1)}%`;
+    }
+
+    function aplicarSpTexto() {
+      let val = parseFloat(document.getElementById("inputSpExact").value);
+      if (isNaN(val)) return;
+      fijarSetpoint(val);
+    }
+
+    function fijarSetpoint(val) {
+      val = Math.max(0, Math.min(100, val));
+      document.getElementById("chkPotFio").checked = false;
+      sliderSp.value = val;
+      document.getElementById("inputSpExact").value = val.toFixed(1);
+      actualizarTextoSp(val);
+      enviarConfig({ setpoint_pct: val, usar_pot_fio: false });
+    }
+
+    function obtenerModoSeleccionado() {
+      const r = document.querySelector('input[name="modoControl"]:checked');
+      return r ? r.value : "PID";
+    }
+
+    function onSliderValvulas() {
+      const desc = parseFloat(document.getElementById("sliderDesc").value);
+      const fillM = parseFloat(document.getElementById("sliderFillManual").value);
+      document.getElementById("lblDescBase").textContent = `${desc.toFixed(0)}%`;
+      document.getElementById("lblFillMan").textContent = `${fillM.toFixed(0)}%`;
+      enviarConfig({
+        discharge_base_pct: desc,
+        fill_manual_pct: fillM
+      });
+    }
+
+    function aplicarGanancias() {
+      const kp = parseFloat(document.getElementById("inputKp").value);
+      const ki = parseFloat(document.getElementById("inputKi").value);
+      const kd = parseFloat(document.getElementById("inputKd").value);
+      if (isNaN(kp) || isNaN(ki) || isNaN(kd)) return;
+      enviarConfig({ kp, ki, kd });
+    }
+
+    function cargarPreset(kp, ki, kd) {
+      document.getElementById("inputKp").value = kp.toFixed(4);
+      document.getElementById("inputKi").value = ki.toFixed(4);
+      document.getElementById("inputKd").value = kd.toFixed(4);
+      enviarConfig({ kp, ki, kd });
+    }
+
+    function accionCsv(action) {
+      enviarConfig({ csv_action: action });
+    }
+
+    async function enviarConfig(extra = {}) {
+      const payload = {
+        modo: obtenerModoSeleccionado(),
+        usar_pot_fio: document.getElementById("chkPotFio").checked,
+        descarga_auto: document.getElementById("chkDescAuto").checked,
+        discharge_base_pct: parseFloat(document.getElementById("sliderDesc").value),
+        fill_manual_pct: parseFloat(document.getElementById("sliderFillManual").value),
+        ...extra
+      };
+      try {
+        await fetch("/api/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        // Ignorar si se abre como archivo local sin servidor
+      }
+    }
+
+    // Consulta periódica al backend Python (cada 200 ms)
+    async function actualizarEstado() {
+      try {
+        const resp = await fetch("/api/state");
+        if (!resp.ok) throw new Error("HTTP error");
+        state = await resp.json();
+
+        const badge = document.getElementById("badgeConn");
+        if (state.conectado) {
+          badge.textContent = `CONECTADO A FACTORY I/O (${state.host}:${state.port})`;
+          badge.className = "badge-conn online";
+        } else {
+          badge.textContent = `RECONECTANDO A ${state.host}:${state.port}...`;
+          badge.className = "badge-conn offline";
+        }
+
+        if (state.usar_pot_fio) {
+          sliderSp.value = state.setpoint_pct;
+          document.getElementById("inputSpExact").value = state.setpoint_pct.toFixed(1);
+        }
+        actualizarTextoSp(state.setpoint_pct);
+
+        // Actualizar KPIs
+        const errPct = state.setpoint_pct - state.nivel_pct;
+        const errCm = (errPct / 100.0) * ALTURA_MAX_CM;
+        const sign = errPct >= 0 ? "+" : "";
+
+        document.getElementById("kpiPv").textContent =
+          `${state.nivel_pct.toFixed(1)} %  |  ${state.nivel_cm.toFixed(1)} cm  |  ${state.nivel_v.toFixed(2)} V`;
+        document.getElementById("kpiErr").textContent =
+          `${sign}${errPct.toFixed(1)} %  (${sign}${errCm.toFixed(1)} cm)`;
+        document.getElementById("kpiValves").textContent =
+          `Fill: ${state.fill_pct.toFixed(1)} %  |  Desc: ${state.discharge_pct.toFixed(1)} %`;
+        document.getElementById("kpiFlow").textContent =
+          `${state.flow_v.toFixed(2)} V`;
+
+        // Estado CSV
+        const boxCsv = document.getElementById("boxCsvStatus");
+        const btnToggle = document.getElementById("btnToggleCsv");
+        if (state.registrando_csv) {
+          boxCsv.innerHTML = `● GRABANDO: ${state.muestras_guardadas} muestras<br/>registro_pid_tanque.csv`;
+          boxCsv.className = "csv-status";
+          btnToggle.textContent = "Pausar CSV";
+          btnToggle.className = "btn btn-amber";
+        } else {
+          boxCsv.innerHTML = `❚❚ EN PAUSA: ${state.muestras_guardadas} muestras<br/>registro_pid_tanque.csv`;
+          boxCsv.className = "csv-status paused";
+          btnToggle.textContent = "Reanudar CSV";
+          btnToggle.className = "btn btn-green";
+        }
+      } catch (err) {
+        const badge = document.getElementById("badgeConn");
+        badge.textContent = "SERVIDOR PYTHON DESCONECTADO (Ejecuta dashboard_web_pid.py)";
+        badge.className = "badge-conn offline";
+      }
+
+      dibujarTanque();
+      dibujarGraficas();
+    }
+
+    // Renderizado del Tanque 2D (idéntico al Canvas de Tkinter)
+    function dibujarTanque() {
+      const canvas = document.getElementById("canvasTanque");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const x1 = 58, y1 = 35, x2 = 198, y2 = 335;
+      const wTank = x2 - x1;
+      const hTank = y2 - y1;
+
+      // Tubería superior Fill Valve
+      ctx.fillStyle = state.fill_pct > 1.0 ? "#10B981" : "#374151";
+      ctx.strokeStyle = "#6B7280";
+      ctx.lineWidth = 1;
+      ctx.fillRect(121, 8, 14, y1 - 8);
+      ctx.strokeRect(121, 8, 14, y1 - 8);
+
+      // Chorro de agua cayendo
+      if (state.fill_pct > 1.0) {
+        const wJet = Math.max(2, Math.round((state.fill_pct / 100.0) * 10));
+        ctx.fillStyle = "#38BDF8";
+        ctx.fillRect(128 - Math.floor(wJet / 2), y1, wJet, hTank);
+      }
+
+      // Agua acumulada en el tanque
+      const fracPv = Math.max(0.0, Math.min(1.0, state.nivel_pct / 100.0));
+      const hAgua = Math.round(fracPv * hTank);
+      const yAgua = y2 - hAgua;
+      if (fracPv > 0.002) {
+        ctx.fillStyle = Math.abs(state.setpoint_pct - state.nivel_pct) > 3.0 ? "#0284C7" : "#059669";
+        ctx.fillRect(x1 + 2, yAgua, wTank - 4, hAgua - 2);
+      }
+
+      // Contorno del tanque
+      ctx.strokeStyle = "#9CA3AF";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x1, y1, wTank, hTank);
+
+      // Marcas de escala (0%, 25%, 50%, 75%, 100%)
+      ctx.font = "11px Consolas, monospace";
+      [0, 25, 50, 75, 100].forEach(pct => {
+        const ym = y2 - Math.round((pct / 100.0) * hTank);
+        const cmVal = Math.round((pct / 100.0) * ALTURA_MAX_CM);
+
+        ctx.strokeStyle = "#9CA3AF";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1 - 6, ym);
+        ctx.lineTo(x1, ym);
+        ctx.moveTo(x2, ym);
+        ctx.lineTo(x2 + 6, ym);
+        ctx.stroke();
+
+        ctx.fillStyle = "#9CA3AF";
+        ctx.textAlign = "right";
+        ctx.fillText(`${pct}%`, x1 - 9, ym + 4);
+
+        ctx.fillStyle = "#6B7280";
+        ctx.textAlign = "left";
+        ctx.fillText(`${cmVal}cm`, x2 + 9, ym + 4);
+      });
+
+      // Línea punteada del Setpoint (SP)
+      const fracSp = Math.max(0.0, Math.min(1.0, state.setpoint_pct / 100.0));
+      const ySp = y2 - Math.round(fracSp * hTank);
+      ctx.save();
+      ctx.strokeStyle = "#F87171";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1 - 4, ySp);
+      ctx.lineTo(x2 + 4, ySp);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = "#FCA5A5";
+      ctx.font = "bold 12px Consolas, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`SP: ${state.setpoint_pct.toFixed(1)}%`, (x1 + x2) / 2, Math.max(y1 + 14, ySp - 7));
+
+      // Texto central de Nivel Actual
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 16px Consolas, monospace";
+      ctx.fillText(`${state.nivel_pct.toFixed(1)}%`, (x1 + x2) / 2, (y1 + y2) / 2 - 6);
+      ctx.font = "bold 13px Consolas, monospace";
+      ctx.fillText(`(${state.nivel_cm.toFixed(1)} cm)`, (x1 + x2) / 2, (y1 + y2) / 2 + 14);
+
+      // Tubería de descarga inferior
+      ctx.fillStyle = state.discharge_pct > 1.0 ? "#F59E0B" : "#374151";
+      ctx.strokeStyle = "#6B7280";
+      ctx.lineWidth = 1;
+      ctx.fillRect(x2, y2 - 18, 35, 12);
+      ctx.strokeRect(x2, y2 - 18, 35, 12);
+
+      ctx.fillStyle = "#D1D5DB";
+      ctx.font = "bold 11.5px Consolas, monospace";
+      ctx.fillText(
+        `Fill: ${state.fill_pct.toFixed(1)}%  |  Descarga: ${state.discharge_pct.toFixed(1)}%`,
+        130, 366
+      );
+    }
+
+    // Renderizado de las 2 gráficas en tiempo real
+    function dibujarGraficas() {
+      const canvas = document.getElementById("canvasPlot");
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = Math.max(350, rect.width);
+      canvas.height = Math.max(420, rect.height);
+
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const padL = 52, padR = 20, padT = 24, padB = 34, gap = 36;
+      const hUtil = h - padT - padB - gap;
+      const h1 = Math.floor(hUtil * 0.58);
+      const h2 = hUtil - h1;
+
+      const y1Top = padT, y1Bot = padT + h1;
+      const y2Top = y1Bot + gap, y2Bot = y1Bot + gap + h2;
+      const xLeft = padL, xRight = w - padR;
+
+      dibujarMarcoEjes(ctx, xLeft, y1Top, xRight, y1Bot, "Nivel PV vs Setpoint SP [%]");
+      dibujarMarcoEjes(ctx, xLeft, y2Top, xRight, y2Bot, "Apertura de Válvulas [%]");
+
+      const tArr = state.hist_t || [];
+      if (tArr.length < 2) {
+        ctx.fillStyle = "#9CA3AF";
+        ctx.font = "14px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Esperando datos de Factory I/O...", (xLeft + xRight) / 2, (y1Top + y1Bot) / 2);
+        return;
+      }
+
+      const tMin = tArr[0];
+      const tMax = Math.max(tMin + 10.0, tArr[tArr.length - 1]);
+
+      function trazarSerie(yArr, yTop, yBot, color, width, dash = []) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        const ancho = xRight - xLeft;
+        const alto = yBot - yTop;
+        for (let i = 0; i < tArr.length; i++) {
+          const px = xLeft + ((tArr[i] - tMin) / (tMax - tMin)) * ancho;
+          const yClamped = Math.max(0.0, Math.min(100.0, yArr[i]));
+          const py = yBot - (yClamped / 100.0) * alto;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Gráfica 1: SP y PV
+      trazarSerie(state.hist_sp, y1Top, y1Bot, "#F87171", 2.0, [6, 4]);
+      trazarSerie(state.hist_pv, y1Top, y1Bot, "#38BDF8", 2.5);
+
+      ctx.fillStyle = "#E5E7EB";
+      ctx.font = "bold 12px Consolas, monospace";
+      ctx.textAlign = "right";
+      ctx.fillText("── Nivel (PV)   - - Setpoint (SP)", xRight - 10, y1Top + 16);
+
+      // Gráfica 2: Fill Valve y Discharge Valve
+      trazarSerie(state.hist_desc, y2Top, y2Bot, "#F59E0B", 1.8, [4, 3]);
+      trazarSerie(state.hist_fill, y2Top, y2Bot, "#34D399", 2.2);
+
+      ctx.fillStyle = "#E5E7EB";
+      ctx.fillText("── Fill Valve (%)   - - Discharge Valve (%)", xRight - 10, y2Top + 16);
+
+      // Eje X de tiempo
+      ctx.fillStyle = "#9CA3AF";
+      ctx.font = "11px Consolas, monospace";
+      ctx.textAlign = "center";
+      for (let i = 0; i <= 5; i++) {
+        const frac = i / 5.0;
+        const tx = xLeft + frac * (xRight - xLeft);
+        const tVal = tMin + frac * (tMax - tMin);
+        ctx.strokeStyle = "#9CA3AF";
+        ctx.beginPath();
+        ctx.moveTo(tx, y2Bot);
+        ctx.lineTo(tx, y2Bot + 5);
+        ctx.stroke();
+        ctx.fillText(`${tVal.toFixed(1)}s`, tx, y2Bot + 18);
+      }
+    }
+
+    function dibujarMarcoEjes(ctx, x1, y1, x2, y2, titulo) {
+      ctx.fillStyle = "#0F172A";
+      ctx.strokeStyle = "#4B5563";
+      ctx.lineWidth = 1;
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+      ctx.fillStyle = "#93C5FD";
+      ctx.font = "bold 12px 'Segoe UI', sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(titulo, x1 + 6, y1 - 7);
+
+      ctx.font = "11px Consolas, monospace";
+      ctx.textAlign = "right";
+      [0, 25, 50, 75, 100].forEach(pct => {
+        const ym = y2 - (pct / 100.0) * (y2 - y1);
+        ctx.save();
+        ctx.strokeStyle = "#1E293B";
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x1, ym);
+        ctx.lineTo(x2, ym);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = "#9CA3AF";
+        ctx.fillText(`${pct}%`, x1 - 6, ym + 4);
+      });
+    }
+
+    window.addEventListener("resize", dibujarGraficas);
+    setInterval(actualizarEstado, 200);
+    dibujarTanque();
+    dibujarGraficas();
+  </script>
+</body>
+</html>

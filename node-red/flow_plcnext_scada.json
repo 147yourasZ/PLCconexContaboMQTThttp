@@ -1,0 +1,633 @@
+[
+  {
+    "id": "tab_plc_opcua",
+    "type": "tab",
+    "label": "1. PLCnext OPC UA (192.168.1.10)",
+    "disabled": false,
+    "info": "El PLC controla Factory I/O. Node-RED lee/escribe al PLC vía OPC UA."
+  },
+  {
+    "id": "tab_web_scada",
+    "type": "tab",
+    "label": "2. Web SCADA (dashboard_scada.html)",
+    "disabled": false,
+    "info": "Sirve dashboard_scada.html y API REST"
+  },
+  {
+    "id": "tab_mqtt_contabo",
+    "type": "tab",
+    "label": "3. MQTT Telemetría (Contabo)",
+    "disabled": false,
+    "info": "Publicación y órdenes bidireccionales con Contabo 169.58.165.54:1883"
+  },
+  {
+    "id": "tab_bridge_fio",
+    "type": "tab",
+    "label": "4. Puente Modbus <-> PLC",
+    "disabled": false,
+    "info": "Puente transparente entre Factory I/O (192.168.1.11:502) y PLCnext (192.168.1.10:4840). Sin PID en Node-RED."
+  },
+  {
+    "id": "opcua_endpoint_plc",
+    "type": "OpcUa-Endpoint",
+    "endpoint": "opc.tcp://192.168.1.10:4840",
+    "secpol": "None",
+    "secmode": "None",
+    "none": true,
+    "login": false,
+    "usercert": false,
+    "usercertificate": "",
+    "userprivatekey": ""
+  },
+  {
+    "id": "mqtt_broker_contabo",
+    "type": "mqtt-broker",
+    "name": "MQTT Contabo (169.58.165.54)",
+    "broker": "169.58.165.54",
+    "port": "1883",
+    "clientid": "nodered_pid_tanque",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "closeTopic": "",
+    "closePayload": "",
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": "",
+    "credentials": {
+      "user": "gateway",
+      "password": "PLC_Gateway2026!"
+    }
+  },
+  {
+    "id": "modbus_fio_server",
+    "type": "modbus-client",
+    "name": "Factory IO Modbus TCP (192.168.1.11:502)",
+    "clienttype": "tcp",
+    "bufferCommands": true,
+    "stateLogEnabled": false,
+    "queueLogEnabled": false,
+    "failureLogEnabled": false,
+    "tcpHost": "192.168.1.11",
+    "tcpPort": "502",
+    "tcpType": "DEFAULT",
+    "serialPort": "",
+    "serialType": "RTU-BUFFERD",
+    "serialBaudrate": "9600",
+    "serialDatabits": "8",
+    "serialStopbits": "1",
+    "serialParity": "none",
+    "serialConnectionDelay": "100",
+    "serialAsciiResponseStartDelimiter": "",
+    "unit_id": "1",
+    "commandDelay": "1",
+    "clientTimeout": "1000",
+    "reconnectOnTimeout": true,
+    "reconnectTimeout": "2000",
+    "parallelUnitIdsAllowed": true,
+    "showErrors": false,
+    "showWarnings": true,
+    "showLogs": true
+  },
+  {
+    "id": "inj_plc_200ms",
+    "type": "inject",
+    "z": "tab_plc_opcua",
+    "name": "Leer PLC cada 200ms",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "0.2",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "1",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 140,
+    "y": 120,
+    "wires": [
+      [
+        "fn_prep_plc"
+      ]
+    ]
+  },
+  {
+    "id": "fn_prep_plc",
+    "type": "function",
+    "z": "tab_plc_opcua",
+    "name": "Preparar Tags PLCnext",
+    "func": "const mainTags = [\n  \"Nivel_Pct\", \"Nivel_CM\", \"Nivel_Voltios\", \"Flow_Voltios\",\n  \"Setpoint_Pct\", \"Fill_Valve_Pct\", \"Discharge_Valve_Pct\",\n  \"Fill_Valve_Raw\", \"Discharge_Valve_Raw\", \"SP_Display_CM\", \"PV_Display_CM\",\n  \"PID_Kp\", \"PID_Ki\", \"PID_Kd\",\n  \"Modo_Control\", \"Usar_Pot_FIO\", \"Descarga_Auto\", \"Sistema_Activo\"\n];\nconst globalTags = [\"DI_Start\", \"DI_Stop\", \"DI_Modo_Local\"];\nconst reads = [\n  ...globalTags.map(t => ({ topic: \"ns=6;s=Arp.Plc.Eclr/\" + t, action: \"read\" })),\n  ...mainTags.map(t => ({ topic: \"ns=6;s=Arp.Plc.Eclr/MainInstance.\" + t, action: \"read\" }))\n];\nreturn [reads];",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 360,
+    "y": 120,
+    "wires": [
+      [
+        "opcua_read_plc"
+      ]
+    ]
+  },
+  {
+    "id": "opcua_read_plc",
+    "type": "OpcUa-Client",
+    "z": "tab_plc_opcua",
+    "endpoint": "opcua_endpoint_plc",
+    "action": "read",
+    "deadbandtype": "a",
+    "deadbandvalue": 1,
+    "time": 10,
+    "timeUnit": "s",
+    "certificate": "n",
+    "localfile": "",
+    "localkeyfile": "",
+    "securitymode": "None",
+    "securitypolicy": "None",
+    "folderName4PKI": "",
+    "name": "OPC UA Read AXC F 2152",
+    "x": 600,
+    "y": 120,
+    "wires": [
+      [
+        "fn_proc_plc"
+      ],
+      [],
+      []
+    ]
+  },
+  {
+    "id": "fn_proc_plc",
+    "type": "function",
+    "z": "tab_plc_opcua",
+    "name": "Actualizar Estado + CSV + MQTT + FIO",
+    "func": "const now = Date.now();\nconst st = global.get(\"tanque_state\") || {\n  conectado: false,\n  host: \"192.168.1.10\",\n  port: 4840,\n  modo: \"PID\",\n  sistema_activo: true,\n  di_start: false,\n  di_stop: false,\n  di_modo_local: false,\n  usar_pot_fio: false,\n  descarga_auto: true,\n  setpoint_pct: 50.0,\n  nivel_pct: 0.0,\n  nivel_cm: 0.0,\n  nivel_v: 0.0,\n  flow_v: 0.0,\n  fill_pct: 0.0,\n  discharge_pct: 35.0,\n  fill_raw: 0,\n  desc_raw: 0,\n  sp_cm_raw: 0,\n  pv_cm_raw: 0,\n  kp: 3.2,\n  ki: 0.25,\n  kd: 1.8,\n  t0: now,\n  last_rx: 0,\n  last_mqtt_ms: 0,\n  registrando_csv: true,\n  muestras_guardadas: 0,\n  hist_t: [],\n  hist_sp: [],\n  hist_pv: [],\n  hist_fill: [],\n  hist_desc: [],\n  csv_rows: [\"timestamp,tiempo_s,modo_control,setpoint_pct,setpoint_cm,nivel_pct,nivel_cm,nivel_voltios,error_pct,fill_valve_pct,discharge_valve_pct,flow_voltios,kp,ki,kd\"]\n};\n\nconst topic = msg.topic || \"\";\nconst tag = topic.split(\"/\").pop().split(\".\").pop();\nconst val = msg.payload;\n\nif (val !== undefined && val !== null) {\n  st.host = \"192.168.1.10\";\n  st.port = 4840;\n  st.conectado = true;\n  st.last_rx = now;\n  if (tag === \"Nivel_Pct\") st.nivel_pct = Number(val);\n  else if (tag === \"Nivel_CM\") st.nivel_cm = Number(val);\n  else if (tag === \"Nivel_Voltios\") st.nivel_v = Number(val);\n  else if (tag === \"Flow_Voltios\") st.flow_v = Number(val);\n  else if (tag === \"Setpoint_Pct\") st.setpoint_pct = Number(val);\n  else if (tag === \"Fill_Valve_Pct\") st.fill_pct = Number(val);\n  else if (tag === \"Discharge_Valve_Pct\") st.discharge_pct = Number(val);\n  else if (tag === \"Fill_Valve_Raw\") st.fill_raw = Number(val);\n  else if (tag === \"Discharge_Valve_Raw\") st.desc_raw = Number(val);\n  else if (tag === \"SP_Display_CM\") st.sp_cm_raw = Number(val);\n  else if (tag === \"PV_Display_CM\") st.pv_cm_raw = Number(val);\n  else if (tag === \"PID_Kp\") st.kp = Number(val);\n  else if (tag === \"PID_Ki\") st.ki = Number(val);\n  else if (tag === \"PID_Kd\") st.kd = Number(val);\n  else if (tag === \"Modo_Control\") st.modo = val ? \"PID\" : \"MANUAL\";\n  else if (tag === \"Usar_Pot_FIO\") st.usar_pot_fio = Boolean(val);\n  else if (tag === \"Descarga_Auto\") st.descarga_auto = Boolean(val);\n  else if (tag === \"DI_Start\") st.di_start = Boolean(val);\n  else if (tag === \"DI_Stop\") st.di_stop = Boolean(val);\n  else if (tag === \"DI_Modo_Local\") {\n    st.di_modo_local = Boolean(val);\n    if (st.di_modo_local) st.usar_pot_fio = true;\n  } else if (tag === \"Sistema_Activo\") {\n    st.sistema_activo = Boolean(val);\n  }\n}\n\nif (tag === \"Sistema_Activo\") {\n  const t_s = Number(((now - st.t0) / 1000.0).toFixed(2));\n  st.hist_t.push(t_s);\n  st.hist_sp.push(Number(st.setpoint_pct.toFixed(2)));\n  st.hist_pv.push(Number(st.nivel_pct.toFixed(2)));\n  st.hist_fill.push(Number(st.fill_pct.toFixed(2)));\n  st.hist_desc.push(Number(st.discharge_pct.toFixed(2)));\n  if (st.hist_t.length > 600) {\n    st.hist_t.shift(); st.hist_sp.shift(); st.hist_pv.shift(); st.hist_fill.shift(); st.hist_desc.shift();\n  }\n  const sp_cm = (st.setpoint_pct / 100.0) * 300.0;\n  if (st.registrando_csv) {\n    const err_pct = st.setpoint_pct - st.nivel_pct;\n    const ts = new Date().toISOString().replace(\"T\", \" \").slice(0, 23);\n    st.csv_rows.push([\n      ts, t_s.toFixed(3), st.modo, st.setpoint_pct.toFixed(2), sp_cm.toFixed(2),\n      st.nivel_pct.toFixed(2), st.nivel_cm.toFixed(2), st.nivel_v.toFixed(3),\n      err_pct.toFixed(2), st.fill_pct.toFixed(2), st.discharge_pct.toFixed(2),\n      st.flow_v.toFixed(3), st.kp.toFixed(4), st.ki.toFixed(4), st.kd.toFixed(4)\n    ].join(\",\"));\n    if (st.csv_rows.length > 5000) st.csv_rows.splice(1, 1);\n    st.muestras_guardadas = st.csv_rows.length - 1;\n  }\n\n  let mqttMsg = null;\n  if (now - (st.last_mqtt_ms || 0) >= 1000) {\n    st.last_mqtt_ms = now;\n    mqttMsg = {\n      topic: \"planta/plc1756/datos\",\n      payload: {\n        origen: \"PLCnext_AXCF2152\",\n        modo: st.modo,\n        sistema_activo: st.sistema_activo,\n        di_start: st.di_start,\n        di_stop: st.di_stop,\n        usar_pot_fio: st.usar_pot_fio,\n        setpoint_pct: Number(st.setpoint_pct.toFixed(2)),\n        nivel_pct: Number(st.nivel_pct.toFixed(2)),\n        nivel_cm: Number(st.nivel_cm.toFixed(2)),\n        nivel_v: Number(st.nivel_v.toFixed(3)),\n        flow_v: Number(st.flow_v.toFixed(3)),\n        fill_valve_pct: Number(st.fill_pct.toFixed(2)),\n        discharge_valve_pct: Number(st.discharge_pct.toFixed(2)),\n        kp: st.kp,\n        ki: st.ki,\n        kd: st.kd,\n        timestamp: new Date().toISOString()\n      }\n    };\n  }\n\n  let modbusWriteMsg = null;\n  if (st.conectado && st.last_rx && (now - st.last_rx) < 3000) {\n    const clamp16 = (v) => Math.max(0, Math.min(32767, Math.round(Number(v) || 0)));\n    modbusWriteMsg = {\n      payload: {\n        value: [\n          clamp16(st.fill_raw),\n          clamp16(st.desc_raw),\n          clamp16(st.sp_cm_raw),\n          clamp16(st.pv_cm_raw)\n        ],\n        fc: 16,\n        unitid: 1,\n        address: 0,\n        quantity: 4\n      }\n    };\n  }\n\n  global.set(\"tanque_state\", st);\n  return [mqttMsg, modbusWriteMsg];\n}\nglobal.set(\"tanque_state\", st);\nreturn [null, null];",
+    "outputs": 2,
+    "noerr": 0,
+    "x": 890,
+    "y": 120,
+    "wires": [
+      [
+        "link_out_mqtt"
+      ],
+      [
+        "link_out_plc_to_fio"
+      ]
+    ]
+  },
+  {
+    "id": "link_out_mqtt",
+    "type": "link out",
+    "z": "tab_plc_opcua",
+    "name": "A MQTT Contabo",
+    "mode": "link",
+    "links": [
+      "link_in_mqtt"
+    ],
+    "x": 1150,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "link_out_plc_to_fio",
+    "type": "link out",
+    "z": "tab_plc_opcua",
+    "name": "A Factory I/O Modbus",
+    "mode": "link",
+    "links": [
+      "link_in_plc_to_fio"
+    ],
+    "x": 1160,
+    "y": 150,
+    "wires": []
+  },
+  {
+    "id": "link_in_write",
+    "type": "link in",
+    "z": "tab_plc_opcua",
+    "name": "Comandos y Sensores al PLC",
+    "links": [
+      "link_out_ctrl",
+      "link_out_mqtt_cmd",
+      "link_out_fio_to_plc"
+    ],
+    "x": 170,
+    "y": 240,
+    "wires": [
+      [
+        "opcua_write_plc"
+      ]
+    ]
+  },
+  {
+    "id": "opcua_write_plc",
+    "type": "OpcUa-Client",
+    "z": "tab_plc_opcua",
+    "endpoint": "opcua_endpoint_plc",
+    "action": "write",
+    "deadbandtype": "a",
+    "deadbandvalue": 1,
+    "time": 10,
+    "timeUnit": "s",
+    "certificate": "n",
+    "localfile": "",
+    "localkeyfile": "",
+    "securitymode": "None",
+    "securitypolicy": "None",
+    "folderName4PKI": "",
+    "name": "OPC UA Write AXC F 2152",
+    "x": 450,
+    "y": 240,
+    "wires": [
+      [],
+      [],
+      []
+    ]
+  },
+  {
+    "id": "http_in_scada",
+    "type": "http in",
+    "z": "tab_web_scada",
+    "name": "GET /scada",
+    "url": "/scada",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 130,
+    "y": 100,
+    "wires": [
+      [
+        "file_in_html"
+      ]
+    ]
+  },
+  {
+    "id": "file_in_html",
+    "type": "file in",
+    "z": "tab_web_scada",
+    "name": "Leer dashboard_scada.html",
+    "filename": "d:\\Entrga2\\COMPLCconexMQTT-main\\web\\dashboard_scada.html",
+    "filenameType": "str",
+    "format": "utf8",
+    "chunk": false,
+    "sendError": false,
+    "encoding": "none",
+    "allProps": false,
+    "x": 360,
+    "y": 100,
+    "wires": [
+      [
+        "http_resp_html"
+      ]
+    ]
+  },
+  {
+    "id": "http_resp_html",
+    "type": "http response",
+    "z": "tab_web_scada",
+    "name": "Responder HTML",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "text/html; charset=utf-8"
+    },
+    "x": 590,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "http_in_state",
+    "type": "http in",
+    "z": "tab_web_scada",
+    "name": "GET /api/state",
+    "url": "/api/state",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 140,
+    "y": 180,
+    "wires": [
+      [
+        "fn_api_state"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_state",
+    "type": "function",
+    "z": "tab_web_scada",
+    "name": "JSON Estado Tanque",
+    "func": "const st = global.get(\"tanque_state\") || {\n  conectado: false, host: \"192.168.1.10\", port: 4840, modo: \"PID\",\n  sistema_activo: true, di_start: false, di_stop: false,\n  usar_pot_fio: false, descarga_auto: true, setpoint_pct: 50.0,\n  nivel_pct: 0.0, nivel_cm: 0.0, nivel_v: 0.0, flow_v: 0.0,\n  fill_pct: 0.0, discharge_pct: 35.0, kp: 3.2, ki: 0.25, kd: 1.8,\n  last_rx: 0, registrando_csv: true, muestras_guardadas: 0,\n  hist_t: [], hist_sp: [], hist_pv: [], hist_fill: [], hist_desc: []\n};\nconst online = Boolean(st.last_rx && (Date.now() - st.last_rx) < 3000);\nmsg.payload = {\n  conectado: online,\n  host: \"192.168.1.10\",\n  port: 4840,\n  modo: st.modo,\n  sistema_activo: st.sistema_activo,\n  di_start: st.di_start,\n  di_stop: st.di_stop,\n  usar_pot_fio: st.usar_pot_fio,\n  descarga_auto: st.descarga_auto,\n  setpoint_pct: st.setpoint_pct,\n  nivel_pct: st.nivel_pct,\n  nivel_cm: st.nivel_cm,\n  nivel_v: st.nivel_v,\n  flow_v: st.flow_v,\n  fill_pct: st.fill_pct,\n  discharge_pct: st.discharge_pct,\n  kp: st.kp,\n  ki: st.ki,\n  kd: st.kd,\n  registrando_csv: st.registrando_csv,\n  muestras_guardadas: st.muestras_guardadas,\n  hist_t: st.hist_t,\n  hist_sp: st.hist_sp,\n  hist_pv: st.hist_pv,\n  hist_fill: st.hist_fill,\n  hist_desc: st.hist_desc\n};\nmsg.headers = { \"Content-Type\": \"application/json\", \"Cache-Control\": \"no-store\" };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 360,
+    "y": 180,
+    "wires": [
+      [
+        "http_resp_state"
+      ]
+    ]
+  },
+  {
+    "id": "http_resp_state",
+    "type": "http response",
+    "z": "tab_web_scada",
+    "name": "Responder JSON",
+    "statusCode": "200",
+    "headers": {},
+    "x": 590,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "http_in_ctrl",
+    "type": "http in",
+    "z": "tab_web_scada",
+    "name": "POST /api/control",
+    "url": "/api/control",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 260,
+    "wires": [
+      [
+        "fn_api_ctrl"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_ctrl",
+    "type": "function",
+    "z": "tab_web_scada",
+    "name": "Procesar Control Web",
+    "func": "const st = global.get(\"tanque_state\") || {\n  conectado: false, host: \"192.168.1.10\", port: 4840, modo: \"PID\",\n  sistema_activo: true, di_start: false, di_stop: false,\n  usar_pot_fio: false, descarga_auto: true, setpoint_pct: 50.0,\n  nivel_pct: 0.0, nivel_cm: 0.0, nivel_v: 0.0, flow_v: 0.0,\n  fill_pct: 0.0, discharge_pct: 35.0, kp: 3.2, ki: 0.25, kd: 1.8,\n  t0: Date.now(), last_rx: 0, last_mqtt_ms: 0, registrando_csv: true, muestras_guardadas: 0,\n  hist_t: [], hist_sp: [], hist_pv: [], hist_fill: [], hist_desc: [],\n  csv_rows: [\"timestamp,tiempo_s,modo_control,setpoint_pct,setpoint_cm,nivel_pct,nivel_cm,nivel_voltios,error_pct,fill_valve_pct,discharge_valve_pct,flow_voltios,kp,ki,kd\"]\n};\nconst p = msg.payload || {};\n\nconst writes = [];\nconst pushW = (tag, dtype, val) => writes.push({\n  topic: \"ns=6;s=Arp.Plc.Eclr/MainInstance.\" + tag + \";datatype=\" + dtype,\n  payload: val\n});\nif (p.setpoint_pct !== undefined) pushW(\"Setpoint_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.setpoint_pct))));\nif (p.usar_pot_fio !== undefined) pushW(\"Usar_Pot_FIO\", \"Boolean\", Boolean(p.usar_pot_fio));\nif (p.modo === \"PID\" || p.modo === \"MANUAL\") pushW(\"Modo_Control\", \"Boolean\", p.modo === \"PID\");\nif (p.sistema_activo !== undefined) pushW(\"Sistema_Activo\", \"Boolean\", Boolean(p.sistema_activo));\nif (p.descarga_auto !== undefined) pushW(\"Descarga_Auto\", \"Boolean\", Boolean(p.descarga_auto));\nif (p.discharge_base_pct !== undefined) pushW(\"Discharge_Base_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.discharge_base_pct))));\nif (p.fill_manual_pct !== undefined) pushW(\"Fill_Manual_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.fill_manual_pct))));\nif (p.kp !== undefined && p.ki !== undefined && p.kd !== undefined) {\n  pushW(\"PID_Kp\", \"Float\", Number(p.kp));\n  pushW(\"PID_Ki\", \"Float\", Number(p.ki));\n  pushW(\"PID_Kd\", \"Float\", Number(p.kd));\n}\n\nif (p.csv_action === \"toggle\") {\n  st.registrando_csv = !st.registrando_csv;\n} else if (p.csv_action === \"reset\") {\n  st.t0 = Date.now();\n  st.hist_t = []; st.hist_sp = []; st.hist_pv = []; st.hist_fill = []; st.hist_desc = [];\n  st.csv_rows = [st.csv_rows[0]];\n  st.muestras_guardadas = 0;\n}\nglobal.set(\"tanque_state\", st);\nconst httpReply = { ...msg, payload: { ok: true }, headers: { \"Content-Type\": \"application/json\" } };\nreturn [httpReply, writes];",
+    "outputs": 2,
+    "noerr": 0,
+    "x": 360,
+    "y": 260,
+    "wires": [
+      [
+        "http_resp_ctrl"
+      ],
+      [
+        "link_out_ctrl"
+      ]
+    ]
+  },
+  {
+    "id": "http_resp_ctrl",
+    "type": "http response",
+    "z": "tab_web_scada",
+    "name": "Responder OK",
+    "statusCode": "200",
+    "headers": {},
+    "x": 590,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "link_out_ctrl",
+    "type": "link out",
+    "z": "tab_web_scada",
+    "name": "Hacia OPC UA Write",
+    "mode": "link",
+    "links": [
+      "link_in_write"
+    ],
+    "x": 590,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "http_in_csv",
+    "type": "http in",
+    "z": "tab_web_scada",
+    "name": "GET /api/download-csv",
+    "url": "/api/download-csv",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 160,
+    "y": 340,
+    "wires": [
+      [
+        "fn_api_csv"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_csv",
+    "type": "function",
+    "z": "tab_web_scada",
+    "name": "Exportar CSV PID",
+    "func": "const st = global.get(\"tanque_state\") || { csv_rows: [\"timestamp,tiempo_s,modo_control,setpoint_pct,setpoint_cm,nivel_pct,nivel_cm,nivel_voltios,error_pct,fill_valve_pct,discharge_valve_pct,flow_voltios,kp,ki,kd\"] };\nmsg.payload = st.csv_rows.join(\"\\n\");\nmsg.headers = {\n  \"Content-Type\": \"text/csv; charset=utf-8\",\n  \"Content-Disposition\": \"attachment; filename=\\\"registro_pid_tanque.csv\\\"\"\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 380,
+    "y": 340,
+    "wires": [
+      [
+        "http_resp_csv"
+      ]
+    ]
+  },
+  {
+    "id": "http_resp_csv",
+    "type": "http response",
+    "z": "tab_web_scada",
+    "name": "Responder CSV",
+    "statusCode": "200",
+    "headers": {},
+    "x": 590,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "link_in_mqtt",
+    "type": "link in",
+    "z": "tab_mqtt_contabo",
+    "name": "Telemetría Tanque PID",
+    "links": [
+      "link_out_mqtt"
+    ],
+    "x": 150,
+    "y": 120,
+    "wires": [
+      [
+        "mqtt_out_contabo"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt_out_contabo",
+    "type": "mqtt out",
+    "z": "tab_mqtt_contabo",
+    "name": "Publicar a Contabo",
+    "topic": "",
+    "qos": "0",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt_broker_contabo",
+    "x": 410,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "mqtt_in_contabo",
+    "type": "mqtt in",
+    "z": "tab_mqtt_contabo",
+    "name": "Órdenes desde Contabo Web",
+    "topic": "planta/plc1756/ordenes",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "mqtt_broker_contabo",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 180,
+    "y": 220,
+    "wires": [
+      [
+        "fn_mqtt_cmd"
+      ]
+    ]
+  },
+  {
+    "id": "fn_mqtt_cmd",
+    "type": "function",
+    "z": "tab_mqtt_contabo",
+    "name": "Enviar Órdenes al PLC",
+    "func": "let p = msg.payload;\nif (typeof p === \"string\") {\n  try { p = JSON.parse(p); } catch (e) { return null; }\n}\nif (!p || typeof p !== \"object\") return null;\n\nconst writes = [];\nconst pushW = (tag, dtype, val) => writes.push({\n  topic: \"ns=6;s=Arp.Plc.Eclr/MainInstance.\" + tag + \";datatype=\" + dtype,\n  payload: val\n});\nif (p.setpoint_pct !== undefined) pushW(\"Setpoint_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.setpoint_pct))));\nif (p.usar_pot_fio !== undefined) pushW(\"Usar_Pot_FIO\", \"Boolean\", Boolean(p.usar_pot_fio));\nif (p.modo === \"PID\" || p.modo === \"MANUAL\") pushW(\"Modo_Control\", \"Boolean\", p.modo === \"PID\");\nif (p.sistema_activo !== undefined) pushW(\"Sistema_Activo\", \"Boolean\", Boolean(p.sistema_activo));\nif (p.descarga_auto !== undefined) pushW(\"Descarga_Auto\", \"Boolean\", Boolean(p.descarga_auto));\nif (p.discharge_base_pct !== undefined) pushW(\"Discharge_Base_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.discharge_base_pct))));\nif (p.fill_manual_pct !== undefined) pushW(\"Fill_Manual_Pct\", \"Float\", Math.max(0, Math.min(100, Number(p.fill_manual_pct))));\nif (p.kp !== undefined && p.ki !== undefined && p.kd !== undefined) {\n  pushW(\"PID_Kp\", \"Float\", Number(p.kp));\n  pushW(\"PID_Ki\", \"Float\", Number(p.ki));\n  pushW(\"PID_Kd\", \"Float\", Number(p.kd));\n}\n\nreturn [writes];",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 440,
+    "y": 220,
+    "wires": [
+      [
+        "link_out_mqtt_cmd"
+      ]
+    ]
+  },
+  {
+    "id": "link_out_mqtt_cmd",
+    "type": "link out",
+    "z": "tab_mqtt_contabo",
+    "name": "A OPC UA Write",
+    "mode": "link",
+    "links": [
+      "link_in_write"
+    ],
+    "x": 660,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "mb_read_fio_ir",
+    "type": "modbus-read",
+    "z": "tab_bridge_fio",
+    "name": "Leer Sensores Factory I/O (IR 0..2)",
+    "topic": "",
+    "showStatusActivities": false,
+    "logIOActivities": false,
+    "showErrors": false,
+    "showWarnings": true,
+    "unitid": "1",
+    "dataType": "InputRegister",
+    "adr": "0",
+    "quantity": "3",
+    "rate": "200",
+    "rateUnit": "ms",
+    "delayOnStart": false,
+    "startDelayTime": "",
+    "server": "modbus_fio_server",
+    "useIOFile": false,
+    "ioFile": "",
+    "useIOForPayload": false,
+    "emptyMsgOnFail": false,
+    "x": 190,
+    "y": 120,
+    "wires": [
+      [
+        "fn_fio_to_plc"
+      ],
+      []
+    ]
+  },
+  {
+    "id": "fn_fio_to_plc",
+    "type": "function",
+    "z": "tab_bridge_fio",
+    "name": "Formatear Sensores FIO -> OPC UA",
+    "func": "if (!Array.isArray(msg.payload) || msg.payload.length < 3) return null;\nconst toInt16 = (v) => {\n  const n = Number(v) & 0xFFFF;\n  return n > 32767 ? n - 65536 : n;\n};\nconst tags = [\"Level_Meter_Raw\", \"Flow_Meter_Raw\", \"Setpoint_Pot_Raw\"];\nconst writes = tags.map((t, i) => ({\n  topic: \"ns=6;s=Arp.Plc.Eclr/MainInstance.\" + t + \";datatype=Int16\",\n  payload: toInt16(msg.payload[i])\n}));\nreturn [writes];",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 500,
+    "y": 120,
+    "wires": [
+      [
+        "link_out_fio_to_plc"
+      ]
+    ]
+  },
+  {
+    "id": "link_out_fio_to_plc",
+    "type": "link out",
+    "z": "tab_bridge_fio",
+    "name": "Escribir Sensores al PLC",
+    "mode": "link",
+    "links": [
+      "link_in_write"
+    ],
+    "x": 770,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "link_in_plc_to_fio",
+    "type": "link in",
+    "z": "tab_bridge_fio",
+    "name": "Salidas PID desde PLC",
+    "links": [
+      "link_out_plc_to_fio"
+    ],
+    "x": 170,
+    "y": 240,
+    "wires": [
+      [
+        "mb_write_fio_hr"
+      ]
+    ]
+  },
+  {
+    "id": "mb_write_fio_hr",
+    "type": "modbus-flex-write",
+    "z": "tab_bridge_fio",
+    "name": "Escribir Actuadores Factory I/O (HR 0..3)",
+    "showStatusActivities": false,
+    "showErrors": false,
+    "showWarnings": true,
+    "server": "modbus_fio_server",
+    "emptyMsgOnFail": false,
+    "keepMsgProperties": false,
+    "delayOnStart": false,
+    "startDelayTime": "",
+    "x": 490,
+    "y": 240,
+    "wires": [
+      [],
+      []
+    ]
+  }
+]
