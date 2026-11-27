@@ -6,6 +6,8 @@ Sistema completo de automatización y supervisión industrial donde el **PLC Pho
 
 ## 1. Arquitectura en Funcionamiento
 
+![Arquitectura del sistema](docs/arquitectura_nodered.png)
+
 ```mermaid
 flowchart LR
     FIO["Factory I/O<br/>Modbus TCP/IP Server<br/>192.168.1.11:502 (ID 1, Scale 100)"] <-->|"Modbus TCP (200 ms)<br/>IR 0..2 / HR 0..3"| NR["Node-RED Gateway<br/>127.0.0.1:1880<br/>(Puente transparente, sin PID)"]
